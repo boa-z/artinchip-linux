@@ -70,3 +70,39 @@ SPI chip-select API. Buildroot now supplies host OpenSSL and applies the separat
 SPI accessor patch. The successful rebuild started from a fresh kernel extraction,
 so it exercised the committed patch application path. Inherited DTS warnings and
 vendor-driver warnings remain; no DT schema, hardware-driver or boot pass is implied.
+
+## Clean-runner M1 evidence
+
+[D213ECV software run 44146580354](https://github.com/boa-z/artinchip-linux/actions/runs/44146580354)
+passed at project commit `5813a00bfb069dc72f331a4a57b6e718b8643073`. Both board
+profiles, direct boot-component builds, FIT checks, rootfs-only packaging,
+experimental kernel/rootfs packaging and artifact upload succeeded. The uploaded
+artifact was downloaded again: all four checksum sets passed, and both firmware
+containers passed the independent CRC/bounds/protected-target verifier.
+
+[Download the software artifact](https://github.com/boa-z/artinchip-linux/actions/runs/44146580354/artifacts/14359131839)
+within its 14-day retention window. These are the **CI package** SHA256 values:
+
+| Package directory | `.img` SHA256 |
+| --- | --- |
+| `d213ecv-stock510-rootfs-update` | `530655e7dcbc04490a536dd16e2b5bb0d0dadebba1546525570bb479bd0ec4e6` |
+| `d213ecv-linux618-update` | `6bcd2d237399b90054efc53479ae776f3813330acd6bd4bfbc14a229a7c71a81` |
+
+CI and native images are not byte-identical. All six boot assets and the board
+DTB matched between them. Differences include random UBIFS UUIDs, a toolchain
+GDB helper containing its build-prefix path, and `os-release` version metadata
+from different project build states. The embedded kernel config also records
+Rust compiler detection on the runner even though this profile does not enable
+Rust kernel code. Bit-for-bit reproducibility is **not established**; pinning
+sources and recording per-build hashes must not be described as that stronger
+claim. Further reproducibility work should isolate Buildroot version detection
+from the enclosing project Git repository, normalize optional host-tool detection
+and remove irrelevant target debugger paths before evaluating deterministic
+filesystem image generation.
+
+Native builds used development intermediates. Their manifest `project_commit`
+and `working_tree_dirty` fields describe the later collection/packaging step,
+not an attestation that every intermediate was rebuilt at that commit. The
+clean-runner artifact above is the authoritative commit-associated software
+validation evidence. Neither set of artifacts establishes factory Linux 5.10
+mount compatibility, AiBurn flashing success or physical Linux 6.18 boot.

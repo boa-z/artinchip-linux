@@ -41,6 +41,11 @@ The older headers avoid assuming kernel interfaces introduced after Linux 5.10.
 The first generated rootfs was 4,698,112 bytes, UBIFS format 4, with zlib compression.
 `/linuxrc` explicitly enters BusyBox init to preserve the factory `init=/linuxrc`
 boot parameter. A 115200-baud `ttyS0` getty provides the development console.
+The pinned factory 5.10 defconfig builds its SPI controller, SPI NAND, UBIFS and
+serial console into the kernel. This rootfs does not carry factory Wi-Fi modules,
+multimedia services or applications; their operation is outside the first mount
+and shell test. These config checks do not establish the contents of a board's
+currently flashed kernel, which must be recorded during the physical test.
 
 The development image permits passwordless serial root login. It is a bring-up
 image, not a production access-control configuration.
@@ -106,6 +111,20 @@ blindly overwrite Falcon to work around a boot failure. Record the current
 The original environment disables runtime FIT verification (`verify=no`). New
 kernel FITs contain SHA256 hashes that are verified by host packaging checks;
 this milestone does not implement signed/secure boot or create signing keys.
+
+| Boundary | Retained contract | Remaining verification |
+| --- | --- | --- |
+| ROM / RAM updater / SPL | Vendor AIC headers, DDR resources and load/entry addresses | Actual ROM download, DDR training and AiBurn recognition |
+| SPL / OpenSBI / U-Boot | Matching vendor 2021.10 and 0.9 snapshots, S-mode handoff | Physical hart/PMP setup and normal U-Boot boot |
+| U-Boot / kernel FIT | `conf-1`, Linux/OpenSBI/FDT references, factory RAM addresses | Decompression, DT fixups, SBI calls and Linux entry on the board |
+| DT / Linux 6.18 drivers | Legacy compatibles and pinmux values; DMA numeric bindings match vendor 5.10 | Controller clocks, IRQs, DMA/cache coherency and NAND identification |
+| Factory Linux 5.10 / new userspace | LP64D musl with 5.4 headers, ELF/BusyBox init, UBIFS/zlib geometry | Actual mount, login, I/O and reboot persistence |
+
+The vendor board DTS referenced a missing `d211-dma.h`; the pinned vendor source
+itself provides `aic_dma_v10.h`. Its DMA constants match the selected Linux 6.18
+header. This resolves a source compatibility problem without proving DMA runtime
+behavior. The reference CPU ISA string and T-Head errata/cache handling also need
+physical review before the DTS can be treated as an upstream-ready description.
 
 ## Source import and boot components
 
