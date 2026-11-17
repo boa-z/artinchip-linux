@@ -113,12 +113,14 @@ def main():
     parser.add_argument('mode', choices=('run', 'test'))
     parser.add_argument('profile', choices=('baseline', 'linux-7.3.5'))
     parser.add_argument('--timeout', type=int, default=180)
+    parser.add_argument('--images', type=Path, help='Explicit artifact directory instead of output images')
     args = parser.parse_args()
     output = ROOT / 'output' / args.profile
-    cmd = command(output / 'images')
+    cmd = command((args.images.resolve() if args.images else output / 'images'))
     if args.mode == 'run':
         os.execvp(cmd[0], cmd)
     lock = json.loads((ROOT / 'sources.lock.json').read_text())
+    output.mkdir(parents=True, exist_ok=True)
     expected = lock['baseline_kernel' if args.profile == 'baseline' else 'experimental_kernel']
     smoke(cmd, output, expected, args.timeout)
 

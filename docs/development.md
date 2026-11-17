@@ -72,3 +72,12 @@ there are no forwarded host ports and no external network dependency in the test
 
 Raw local build logs may include local paths. Review logs before sharing them.
 Never add private proxy settings, SDK paths or authentication material to a profile.
+
+Collected QEMU images can be replayed after removing compiler intermediates:
+
+```sh
+python3 scripts/qemu.py test baseline --images artifacts/baseline
+```
+
+This explicitly selects the collected firmware/kernel/rootfs set; the usual
+build/test entry points continue to use the current profile's output directory.

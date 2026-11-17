@@ -51,3 +51,36 @@ display code remain outside this milestone.
 No implementation is selected solely because it exists in the vendor tree.
 Each future reuse decision must record provenance, license, upstream alternative,
 interface changes and real hardware tests. Board enablement is a separate phase.
+
+## Current upstream comparison (2026-11-17)
+
+kernel.org listed mainline 7.4-rc3, stable 7.3.5 and longterm 6.18.64 during this
+review. M0 deliberately retains Buildroot's 6.18.7 QEMU baseline and tests 7.3.5
+separately. A later hardware kernel update should evaluate the current 6.18 LTS
+patch level after establishing the reference fork's behavior.
+
+The current Allwinner D1 description splits shared IP from board descriptions
+and reuses compatible IP bindings. StarFive JH7110 supplies standard CPU cache
+properties plus `riscv,isa-base` and `riscv,isa-extensions`, rather than making
+new firmware interfaces out of device-tree properties. These are useful review
+patterns, not evidence that their drivers match ArtInChip register layouts.
+
+OpenSBI's current generic-platform documentation explicitly includes T-HEAD C9xx
+and relies on FDT console, timer and IPI drivers. The latest release observed was
+1.9; M0 pins 1.6. Evaluate existing T-HEAD cache/errata support before introducing
+another private platform or SBI extension.
+
+U-Boot's current RISC-V guide documents the conventional SPL -> OpenSBI -> S-mode
+U-Boot -> Linux path, using FIT to carry firmware and U-Boot. The latest stable tag
+observed was v2026.10, with v2027.01 release candidates available. Board work must
+first understand the factory's DDR and ROM constraints, then assess which vendor
+changes can be replaced with current driver-model/SPL implementations.
+
+References reviewed:
+
+- <https://www.kernel.org/releases.json>
+- <https://github.com/torvalds/linux/tree/master/arch/riscv/boot/dts/allwinner>
+- <https://github.com/torvalds/linux/blob/master/arch/riscv/boot/dts/starfive/jh7110.dtsi>
+- <https://github.com/riscv-software-src/opensbi/blob/master/docs/platform/generic.md>
+- <https://github.com/riscv-software-src/opensbi/blob/master/docs/platform/thead-c9xx.md>
+- <https://docs.u-boot.org/en/latest/arch/riscv.html>
