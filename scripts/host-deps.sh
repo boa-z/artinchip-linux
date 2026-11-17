@@ -11,8 +11,8 @@ case "$mode" in
                 sudo apt-get update
                 sudo apt-get install --no-install-recommends -y \
                     build-essential bash bc binutils bzip2 ca-certificates cpio curl \
-                    file findutils gawk git gzip libncurses-dev patch perl python3 \
-                    qemu-system-misc rsync sed tar unzip wget which xz-utils
+                    debianutils file findutils gawk git gzip libncurses-dev patch perl python3 \
+                    qemu-system-misc rsync sed tar unzip wget xz-utils
                 ;;
             *) echo "See docs/development.md for dependencies on $ID" >&2; exit 1 ;;
         esac
