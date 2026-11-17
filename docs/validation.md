@@ -106,3 +106,16 @@ not an attestation that every intermediate was rebuilt at that commit. The
 clean-runner artifact above is the authoritative commit-associated software
 validation evidence. Neither set of artifacts establishes factory Linux 5.10
 mount compatibility, AiBurn flashing success or physical Linux 6.18 boot.
+
+## Latest M0 regression
+
+[QEMU run 44146580357](https://github.com/boa-z/artinchip-linux/actions/runs/44146580357)
+tests the same software commit `5813a00`. Its baseline job passed compilation,
+Linux 6.18.7 boot/shell smoke, artifact collection and upload. The serial log
+contains `QEMU smoke test PASS` and identifies Linux 6.18.7.
+
+As of 2026-11-17 19:21 UTC, the Linux 7.3.5 matrix job is still in its
+build step. Its current result and the overall workflow result are **pending**,
+not passed. The earlier Linux 7.3.5 success in run `44123924925` remains valid
+historical evidence, but it does not establish this latest run's outcome. The
+separate M1 board workflow above is complete and successful.
