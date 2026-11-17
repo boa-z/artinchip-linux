@@ -45,7 +45,8 @@ vendor profile name. The native M0 artifact replay passed again during M1.
 | Rootfs-only AiBurn container | Generated; environment/FIT/component CRC/capacity checks passed |
 | Partition and malformed-image tests | 11 passed |
 | Buildroot external configuration/patch checks | Passed without warnings |
-| Linux 6.18 | Rebuild in progress after host OpenSSL and SPI API fixes |
+| Linux 6.18.52 | Complete profile build passed after host OpenSSL and SPI API fixes |
+| Experimental Linux 6.18 FIT/update container | SHA256 payload hashes, address/partition bounds and component CRC checks passed |
 | New rootfs mounted by original Linux 5.10 | Not verified; only static ABI/format checks passed |
 | AiBurn recognition/flashing and physical Linux 6.18 boot | Not verified; no board serial log available |
 
@@ -55,3 +56,17 @@ This identifies that native package, not every subsequent build. Each package
 carries its own SHA256SUMS, source/component provenance and hardware status.
 The board CI workflow builds software evidence only; its result must be checked
 independently of the native result. Hardware acceptance remains outstanding.
+
+The native Linux 6.18.52 `Image.gz` is 5,734,204 bytes; the decompressed Image is
+10,913,280 bytes and its RISC-V runtime image size is 11,227,136 bytes. The FIT is
+5,908,753 bytes, below the 12 MiB kernel partition. The matching UBIFS is
+4,825,088 bytes. The experimental update targets exactly `kernel` and
+`ubiroot:rootfs`, and its SHA256 is
+`fede0e17412d637fd4682114b1070315e23183866a26beb59f2eba1f899dbe49`.
+
+The kernel source's release is 6.18.52 at the pinned reference commit. Initial
+native attempts failed on missing host OpenSSL headers and the legacy scalar
+SPI chip-select API. Buildroot now supplies host OpenSSL and applies the separate
+SPI accessor patch. The successful rebuild started from a fresh kernel extraction,
+so it exercised the committed patch application path. Inherited DTS warnings and
+vendor-driver warnings remain; no DT schema, hardware-driver or boot pass is implied.

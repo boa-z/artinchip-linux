@@ -122,7 +122,7 @@ def main():
     run([sys.executable, ROOT / 'tools/vendor/aic/mk_image.py', '-p', '-c', config, '-d', assets], env)
     files = ('usbupg-ddr-init.aic', 'env.bin', 'u-boot.itb', 'logo.itb', 'u-boot-spl-dtb.aic', 'fw_dynamic.bin')
     manifest = {'board': 'D213ECV-DEMO-V4-0', 'source_revision': PIN['commit'],
-                'uboot': '2021.10 vendor', 'opensbi': 'vendor source snapshot',
+                'uboot': '2021.10 vendor', 'opensbi': '0.9 vendor snapshot',
                 'hardware_boot': 'not_verified',
                 'boot_resource_license': 'PBP/DDR resources have no per-file license statement; local evaluation',
                 'sha256': {n: hashlib.sha256((assets / n).read_bytes()).hexdigest() for n in files}}

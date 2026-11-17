@@ -90,6 +90,7 @@ The vendor U-Boot profile selects SPL and S-mode U-Boot. Important source values
 - NAND root parameters: `ubi.mtd=10 root=ubi0:rootfs rootfstype=ubifs` and
   `init=/linuxrc`; the factory environment supplies the complete `MTD` layout.
 
+The boot sources identify U-Boot 2021.10 and OpenSBI 0.9 with vendor changes.
 The factory kernel FIT includes Linux, a DTB and vendor `fw_dynamic.bin`.
 The U-Boot FIT includes vendor OpenSBI, S-mode U-Boot and its DTB. These are
 vendor handoff conventions; replacing OpenSBI or U-Boot with a current upstream

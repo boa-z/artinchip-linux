@@ -141,6 +141,9 @@ def artifacts(output, profile):
     if board:
         manifest['vendor_sources'] = json.loads((ROOT / 'board/artinchip/d213ecv-demo128-nand/vendor-sources.json').read_text())
         manifest['hardware_boot'] = 'not_verified'
+        if kernel:
+            release = next((output / 'build').glob('linux-*/include/config/kernel.release'))
+            manifest['kernel_release'] = release.read_text().strip()
     (dest / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     (dest / 'SHA256SUMS').write_text(''.join(f'{digest(p)}  {p.name}\n' for p in sorted(dest.iterdir()) if p.is_file()))
     print(f'Artifacts: artifacts/{profile}')

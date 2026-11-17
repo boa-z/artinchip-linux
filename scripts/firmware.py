@@ -243,6 +243,9 @@ def pack(args):
     manifest = {'board': LAYOUT['board'], 'vendor_compatibility_name': LAYOUT['vendor_profile'],
                 'project_commit': commit, 'working_tree_dirty': dirty,
                 'kernel_policy': 'experimental_6_18' if args.kernel else 'retain_factory_5_10',
+                'buildroot_source': json.loads((ROOT / 'sources.lock.json').read_text())['buildroot'],
+                'kernel_source': (json.loads((BOARD / 'vendor-sources.json').read_text())['kernel_reference']
+                                  if args.kernel else 'existing factory NAND kernel; unchanged by this image'),
                 'rootfs': rootfs, 'fits': fits, 'environment': environment, 'firmware': result,
                 'component_provenance': provenance, 'packaging': 'passed',
                 'hardware_boot': 'not_verified', 'recovery_policy': 'never targeted'}

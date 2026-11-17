@@ -24,21 +24,33 @@ the smoke test logs in through the serial console.
 
 U-Boot is intentionally not in the M0 QEMU boot path: direct OpenSBI-to-Linux
 boot matches the upstream Buildroot baseline and keeps the initial test small.
-Hardware bring-up will evaluate U-Boot SPL, DDR initialization and the appropriate
-OpenSBI payload mode. Firmware placement, ROM image format and boot media remain
-hardware questions; successful QEMU boot does not validate any of them.
+M1 adds an independent board pipeline for D213ECV-DEMO-V4-0. Buildroot manages
+the pinned Bootlin external toolchain, BusyBox and UBIFS images. A source importer
+exports the pinned existing Linux 6.18 reference and applies a small local patch
+queue. A separate boot builder compiles selected vendor U-Boot/OpenSBI sources
+with ordinary `make`, then the existing vendor container encoder creates AiBurn
+updates. It never invokes the Luban SDK build system.
+
+The first package targets only the rootfs volume to keep the factory Linux 5.10
+test independent of a kernel replacement. The experimental second package adds a
+Linux 6.18 FIT. Both retain the factory partition layout and exclude Recovery.
+Host checks validate format, geometry, bounds and hashes; actual RAM handoff,
+ROM loading, AiBurn behavior and NAND operation require physical evidence. See
+[the M1 guide](m1-d213ecv.md) for the addresses, sources and validation boundaries.
 
 ## Extension boundaries
 
 - `configs/`: separately reviewable board and experimental profiles.
 - `board/artinchip/d211/` and `d213/`: future board configuration and DTS notes.
+- `board/artinchip/d213ecv-demo128-nand/`: current physical-target policy, DTS,
+  source provenance, NAND layout and reference-kernel compatibility patches.
 - `patches/linux/`, `patches/uboot/`, `patches/opensbi/`: future upstream-bound
   patch queues. Empty queues are not enabled in M0 builds.
 - `package/`: optional Buildroot packages when concrete requirements exist;
   `external.mk` already discovers standard package makefiles.
 - `docs/`: decisions, measured validation and hardware research.
 
-Do not add a vendor SDK environment, binary prebuilt toolchain or copied kernel
+Do not add a vendor SDK environment, unmanaged binary toolchain or copied kernel
 tree as an integration layer. Use upstream Kconfig, DTS bindings, standard driver
 subsystems, the U-Boot driver model and generic OpenSBI interfaces wherever they
 match the hardware. Keep board policy separate from SoC descriptions.
