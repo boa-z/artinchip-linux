@@ -1,0 +1,4 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Preserve the vendor U-Boot init=/linuxrc contract without vendor init scripts.
+exec /sbin/init "$@"

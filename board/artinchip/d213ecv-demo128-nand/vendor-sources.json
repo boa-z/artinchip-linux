@@ -1,0 +1,61 @@
+{
+  "repository": "https://github.com/boa-z/luban",
+  "commit": "6812c56d060c7e88e5e5e831a7c915227485b788",
+  "files": [
+    {
+      "path": "tools/vendor/aic/mk_image.py",
+      "upstream_path": "tools/scripts/mk_image.py",
+      "sha256": "920da4478acec40e0583b6a49c8dc22901a8b2be784e156733b316e64a5215c2",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "tools/vendor/aic/pinmux_check.py",
+      "upstream_path": "tools/scripts/pinmux_check.py",
+      "sha256": "f126954b89f2829333af7e25918d041070bfbd2bfb6ed8a657f7b13883d16768",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "board/artinchip/d213ecv-demo128-nand/dts/artinchip/d213ecv-demo128-nand.dts",
+      "upstream_path": "target/d211/demo128_nand/board.dts",
+      "upstream_sha256": "c4dafaf24ca1f284d38162613e97147e3425c9be7eb24a258cfd0b0d667df99f",
+      "license": "GPL-2.0-or-later OR X11",
+      "changes": "Set physical model to D213ECV-DEMO-V4-0; preserve vendor board wiring and legacy compatible.",
+      "sha256": "8adb663c860253cd74a0f5597ec65878f9302b4a741a44a28f81de471a449194"
+    },
+    {
+      "path": "board/artinchip/d213ecv-demo128-nand/dts/artinchip/d211.dtsi",
+      "upstream_path": "target/d211/common/d211.dtsi",
+      "upstream_sha256": "8243e4aab038fc88d44c246b91ae6785febbf22fb97d660beeafe250599d1236",
+      "license": "GPL-2.0-or-later OR X11",
+      "changes": "Use Linux 6.18 DMA binding header; preserve legacy compatibles and hardware description.",
+      "sha256": "6d674127c7b9d0b67b2d5a11889e1680634cfb37e50a1ef4d477d32fcbf6e69c"
+    },
+    {
+      "path": "board/artinchip/d213ecv-demo128-nand/dts/artinchip/d211-pinctrl.dtsi",
+      "upstream_path": "target/d211/common/d211-pinctrl.dtsi",
+      "upstream_sha256": "5bb9dcf3af679f6ddb32014539a58fc36dab3a593d1e1daf2ebb62bbf2819abf",
+      "license": "GPL-2.0-or-later OR X11",
+      "changes": "Use Linux 6.18 pinctrl binding header and include the vendor alternate-pin macro shim.",
+      "sha256": "df2b4b1a16c2134d8415436b1bfc790e46112cb9a98fb3f73e1e3b521482d6bf"
+    },
+    {
+      "path": "board/artinchip/d213ecv-demo128-nand/dts/artinchip/vendor-pinmux-compat.h",
+      "upstream_path": "source/uboot-2021.10/include/dt-bindings/pinctrl/aic-pinctrl.h",
+      "upstream_sha256": "f4b5aecc1bbbecd8bda03a11d8a14a1bc15d444dd3686f1436e741c50d0c2022",
+      "license": "GPL-2.0-or-later",
+      "changes": "Extract only AIC_PINMUX_U for the reference alternate pin groups; retain its original encoding.",
+      "sha256": "b6369eeba0a694636e2b2b60f18974ed748ef8b10168b1238d80528f43a4e22b"
+    }
+  ],
+  "kernel_reference": {
+    "repository": "https://github.com/boa-z/d211-linux-6.18",
+    "commit": "d8e6fff434d60e0e5198d70296d8d94df548962d",
+    "local_patches": [
+      {
+        "path": "board/artinchip/d213ecv-demo128-nand/hashes/linux/0001-spi-artinchip-use-chipselect-accessor.patch",
+        "license": "GPL-2.0-only",
+        "changes": "Use standard SPI chip-select accessor for Linux 6.18 array API."
+      }
+    ]
+  }
+}

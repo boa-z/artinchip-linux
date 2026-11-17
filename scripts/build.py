@@ -18,7 +18,9 @@ LOCK = json.loads((ROOT / 'sources.lock.json').read_text())
 CACHE = ROOT / '.cache'
 SOURCE = CACHE / ('buildroot-' + LOCK['buildroot']['version'])
 PROFILES = {'baseline': 'qemu_riscv64_defconfig',
-            'linux-7.3.5': 'qemu_riscv64_linux_7_3_5_defconfig'}
+            'linux-7.3.5': 'qemu_riscv64_linux_7_3_5_defconfig',
+            'd213ecv-demo128-nand': 'd213ecv_demo128_nand_defconfig',
+            'd213ecv-demo128-nand-linux618': 'd213ecv_demo128_nand_linux618_defconfig'}
 
 
 def digest(path):
@@ -94,22 +96,36 @@ def config_values(path):
     return result
 
 
+def export_text(source, dest):
+    text = source.read_text(errors='replace')
+    text = text.replace(str(ROOT), '<PROJECT_ROOT>').replace(str(Path.home()), '<USER_HOME>')
+    dest.write_text(text)
+
+
 def artifacts(output, profile):
     dest = ROOT / 'artifacts' / profile
     if dest.exists():
         shutil.rmtree(dest)
     dest.mkdir(parents=True)
-    for name in ('Image', 'fw_jump.bin', 'rootfs.ext2'):
+    board = profile.startswith('d213ecv-demo128-nand')
+    images = ('rootfs.ubifs', 'rootfs.ubi', 'rootfs.tar') if board else ('Image', 'fw_jump.bin', 'rootfs.ext2')
+    kernel = not board or profile.endswith('-linux618')
+    if board and kernel:
+        images += ('Image.gz', 'd213ecv-demo128-nand.dtb')
+    for name in images:
         shutil.copy2(output / 'images' / name, dest / name)
-    shutil.copy2(output / '.config', dest / 'buildroot.config')
-    for pattern, name in (('linux-*/.config', 'linux.config'), ('busybox-*/.config', 'busybox.config')):
+    export_text(output / '.config', dest / 'buildroot.config')
+    patterns = [('busybox-*/.config', 'busybox.config')]
+    if kernel:
+        patterns.append(('linux-*/.config', 'linux.config'))
+    for pattern, name in patterns:
         matches = list((output / 'build').glob(pattern))
         if len(matches) != 1:
             raise RuntimeError(f'Expected exactly one {name}; clean stale output')
-        shutil.copy2(matches[0], dest / name)
+        export_text(matches[0], dest / name)
     for name in ('build.log', 'smoke.log', 'smoke-result.json'):
         if (output / name).exists():
-            shutil.copy2(output / name, dest / name)
+            export_text(output / name, dest / name)
     cfg = config_values(output / '.config')
     version_keys = ('BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE', 'BR2_TARGET_OPENSBI_CUSTOM_VERSION_VALUE',
                     'BR2_GCC_VERSION', 'BR2_BINUTILS_VERSION', 'BR2_BUSYBOX_VERSION')
@@ -122,6 +138,9 @@ def artifacts(output, profile):
                 'sources': LOCK, 'config_versions': {k: cfg[k] for k in version_keys if k in cfg},
                 'built_packages': packages, 'qemu': qemu,
                 'sha256': {p.name: digest(p) for p in sorted(dest.iterdir()) if p.is_file()}}
+    if board:
+        manifest['vendor_sources'] = json.loads((ROOT / 'board/artinchip/d213ecv-demo128-nand/vendor-sources.json').read_text())
+        manifest['hardware_boot'] = 'not_verified'
     (dest / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     (dest / 'SHA256SUMS').write_text(''.join(f'{digest(p)}  {p.name}\n' for p in sorted(dest.iterdir()) if p.is_file()))
     print(f'Artifacts: artifacts/{profile}')
@@ -153,6 +172,8 @@ def main():
     elif args.command == 'artifacts':
         artifacts(output, args.profile)
     elif args.command in ('run', 'test'):
+        if args.profile.startswith('d213ecv-demo128-nand'):
+            raise RuntimeError('This is a physical-board rootfs profile; QEMU cannot validate board hardware')
         subprocess.run([sys.executable, str(ROOT / 'scripts/qemu.py'), args.command, args.profile], check=True)
 
 

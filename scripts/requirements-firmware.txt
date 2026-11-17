@@ -1,0 +1,4 @@
+pycryptodomex==3.24.2
+asn1crypto==1.5.1
+gmssl==3.2.2
+fdt==0.3.3

@@ -1,0 +1,95 @@
+name: D213ECV NAND software validation
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md', 'LICENSE*', 'LICENSES/**', 'NOTICE']
+  pull_request:
+    paths-ignore: ['**/*.md', 'LICENSE*', 'LICENSES/**', 'NOTICE']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d213ecv-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  software:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install build dependencies
+        run: |
+          ./scripts/host-deps.sh --install
+          sudo apt-get install --no-install-recommends -y python3-venv
+      - name: Check protected partitions and corrupt-image rejection
+        run: |
+          python3 -m compileall -q scripts tests
+          bash -n scripts/build.sh scripts/host-deps.sh scripts/fetch-ci-reference.sh
+          python3 -m unittest discover -s tests -v
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .cache/dl
+          key: board-downloads-${{ runner.os }}-${{ hashFiles('sources.lock.json', 'configs/d213*', 'board/artinchip/d213ecv-demo128-nand/hashes/**/*.hash') }}
+          restore-keys: board-downloads-${{ runner.os }}-
+      - name: Build the Linux 5.10 compatible rootfs
+        run: |
+          ./scripts/build.sh build d213ecv-demo128-nand
+          python3 scripts/firmware.py rootfs output/d213ecv-demo128-nand/images/rootfs.ubifs
+          ./scripts/build.sh artifacts d213ecv-demo128-nand
+      - name: Fetch only required vendor reference sources on this clean runner
+        run: |
+          ./scripts/fetch-ci-reference.sh https://github.com/boa-z/luban.git \
+            6812c56d060c7e88e5e5e831a7c915227485b788 .cache/luban-reference \
+            source/uboot-2021.10 source/opensbi source/linux-5.10/include/dt-bindings \
+            target/d211/common target/d211/demo128_nand tools/scripts
+      - name: Build boot components and a rootfs-only AiBurn image
+        run: |
+          python3 -m venv .cache/firmware-venv
+          .cache/firmware-venv/bin/pip install -r scripts/requirements-firmware.txt
+          .cache/firmware-venv/bin/python scripts/build-vendor-boot.py \
+            --reference .cache/luban-reference --host output/d213ecv-demo128-nand/host \
+            2>&1 | tee output/d213ecv-demo128-nand/boot-build.log
+          export PATH="$PWD/output/d213ecv-demo128-nand/host/bin:$PATH"
+          .cache/firmware-venv/bin/python scripts/firmware.py pack \
+            --components .cache/vendor-boot/components \
+            --rootfs output/d213ecv-demo128-nand/images/rootfs.ubifs \
+            --output artifacts/d213ecv-stock510-rootfs-update
+      - name: Import pinned Linux 6.18 reference
+        run: |
+          ./scripts/fetch-ci-reference.sh https://github.com/boa-z/d211-linux-6.18.git \
+            d8e6fff434d60e0e5198d70296d8d94df548962d .cache/linux-reference
+          python3 scripts/import-kernel.py --source .cache/linux-reference
+          rm -rf .cache/linux-reference .cache/luban-reference
+      - name: Build Linux 6.18 with ArtInChip support
+        run: |
+          ./scripts/build.sh build d213ecv-demo128-nand-linux618
+          ./scripts/build.sh artifacts d213ecv-demo128-nand-linux618
+      - name: Build and check experimental Linux 6.18 FIT and AiBurn image
+        run: |
+          export PATH="$PWD/output/d213ecv-demo128-nand/host/bin:$PATH"
+          python3 scripts/make-kernel-fit.py \
+            --kernel output/d213ecv-demo128-nand-linux618/images/Image.gz \
+            --dtb output/d213ecv-demo128-nand-linux618/images/d213ecv-demo128-nand.dtb \
+            --opensbi .cache/vendor-boot/components/fw_dynamic.bin \
+            --output artifacts/kernel-6.18.itb
+          .cache/firmware-venv/bin/python scripts/firmware.py pack \
+            --components .cache/vendor-boot/components --kernel artifacts/kernel-6.18.itb \
+            --rootfs output/d213ecv-demo128-nand-linux618/images/rootfs.ubifs \
+            --output artifacts/d213ecv-linux618-update
+      - name: Upload software evidence (hardware boot remains unverified)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: d213ecv-software-${{ github.sha }}
+          path: |
+            artifacts/
+            output/d213ecv-demo128-nand*/build.log
+            output/d213ecv-demo128-nand/boot-build.log
+          retention-days: 14
+          if-no-files-found: warn

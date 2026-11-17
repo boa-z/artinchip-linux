@@ -7,7 +7,12 @@ at configs/qemu_riscv64_virt_defconfig and board/qemu/patches/.
 The Linux 7.3.5 hash is from the kernel.org published checksum list.
 The corresponding license text is in LICENSES/GPL-2.0-or-later.txt.
 
-No source code from Luban or d211-linux-6.18 is incorporated in M0.
+M0 incorporates no Luban or d211-linux-6.18 source code. M1 includes selected
+board DTS files (GPL-2.0-or-later OR X11), a vendor pin encoding compatibility
+definition (GPL-2.0-or-later), and unmodified AIC image/pinmux tools (Apache-2.0).
+Copyright notices remain in the files. Exact origins, hashes and modifications
+are recorded in board/artinchip/d213ecv-demo128-nand/vendor-sources.json.
+Other reference sources are imported into ignored caches only.
 Research references retain their original licenses. Linux, BusyBox,
 OpenSBI, Buildroot and toolchain downloads are separately licensed;
 the repository's MIT license does not apply to them.

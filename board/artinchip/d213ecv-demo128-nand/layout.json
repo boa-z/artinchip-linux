@@ -1,0 +1,25 @@
+{
+  "board": "D213ECV-DEMO-V4-0",
+  "soc": "D213ECV",
+  "vendor_profile": "d211_demo128_nand",
+  "media": "spi-nand",
+  "size": 134217728,
+  "page_size": 2048,
+  "eraseblock_size": 131072,
+  "leb_size": 126976,
+  "max_leb_count": 480,
+  "partitions": [
+    {"name": "spl", "size": 1048576},
+    {"name": "uboot", "size": 1048576},
+    {"name": "userid", "size": 262144},
+    {"name": "bbt", "size": 262144},
+    {"name": "env", "size": 262144},
+    {"name": "env_r", "size": 262144},
+    {"name": "falcon", "size": 262144},
+    {"name": "logo", "size": 786432},
+    {"name": "kernel", "size": 12582912},
+    {"name": "recovery", "size": 16777216, "preserve": true},
+    {"name": "ubiroot", "size": 67108864, "volume": "rootfs"},
+    {"name": "ubisystem", "size": 33554432, "volume": "user"}
+  ]
+}

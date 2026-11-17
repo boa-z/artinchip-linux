@@ -2,12 +2,17 @@
 
 An independent, upstream-oriented embedded Linux platform for future ArtInChip
 D211/D213 support. Standard Buildroot, Linux, OpenSBI and eventually U-Boot are
-the integration boundaries. The Luban SDK and previous kernel forks are research
-references, never build dependencies.
+the integration boundaries. M1 imports pinned reference boot/kernel sources,
+but never invokes or requires the complete Luban build system.
 
-M0 provides a RISC-V 64-bit QEMU development baseline. It does not provide a
-bootable D211/D213 board image. Hardware drivers, NAND flashing, multimedia,
-DRM/KMS and OTA are outside this milestone.
+The current and only physical validation target is **D213ECV-DEMO-V4-0**.
+M1 board build, firmware packaging, validation boundaries and operator instructions
+are documented in [the hardware bring-up guide](docs/m1-d213ecv.md).
+
+M0 provides a verified RISC-V 64-bit QEMU development baseline. M1 adds independent
+board rootfs/kernel profiles and recovery-preserving AiBurn packaging. Physical
+board boot remains unverified until serial evidence is recorded. Multimedia,
+DRM/KMS and OTA remain outside the current bring-up work.
 
 ## Quick start
 

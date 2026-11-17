@@ -31,3 +31,27 @@ duplicating its complete toolchain build on the native server.
 
 No physical-board boot, device driver validation, U-Boot hardware boot chain or
 bit-for-bit reproducibility claim is made by M0.
+
+# M1 software validation (hardware pending)
+
+The physical target is D213ECV-DEMO-V4-0; `d211_demo128_nand` is only the
+vendor profile name. The native M0 artifact replay passed again during M1.
+
+| Check | Native result |
+| --- | --- |
+| Independent board rootfs | Build passed; 4,698,112-byte UBIFS, format 4, zlib |
+| Rootfs geometry/capacity | 2 KiB I/O, 124 KiB LEB, maximum 480 LEBs; passed |
+| Vendor SPL, U-Boot and OpenSBI | Direct builds passed outside the Luban build system |
+| Rootfs-only AiBurn container | Generated; environment/FIT/component CRC/capacity checks passed |
+| Partition and malformed-image tests | 11 passed |
+| Buildroot external configuration/patch checks | Passed without warnings |
+| Linux 6.18 | Rebuild in progress after host OpenSSL and SPI API fixes |
+| New rootfs mounted by original Linux 5.10 | Not verified; only static ABI/format checks passed |
+| AiBurn recognition/flashing and physical Linux 6.18 boot | Not verified; no board serial log available |
+
+The initial rootfs-only image SHA256 is
+`691afe83820af1ce798dfc54b2c05c7c2eca910e4dea0db49897f80ea67ed757`.
+This identifies that native package, not every subsequent build. Each package
+carries its own SHA256SUMS, source/component provenance and hardware status.
+The board CI workflow builds software evidence only; its result must be checked
+independently of the native result. Hardware acceptance remains outstanding.

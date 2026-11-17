@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: MIT
+# Deterministic git archive + gzip export of the pinned kernel reference.
+sha256  cc63f9b86af3eeb13e72543a5a30e8d7379f615758a74670a856b4d528d9c9e2  linux-d8e6fff434d60e0e5198d70296d8d94df548962d.tar.gz

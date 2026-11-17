@@ -1,0 +1,32 @@
+From: boa-z <boa-z@outlook.com>
+Subject: [PATCH] spi: artinchip: use the chip-select accessor
+
+Linux 6.18 represents spi_device.chip_select as an array. Use the
+standard accessor for the first hardware chip select when configuring
+this single-select controller, rather than passing the array address.
+
+Applies to d211-linux-6.18 d8e6fff434d60e0e5198d70296d8d94df548962d.
+SPDX-License-Identifier: GPL-2.0-only
+Upstream: Not submitted; bring-up fix for the existing vendor driver.
+Signed-off-by: boa-z <boa-z@outlook.com>
+
+--- a/drivers/spi/spi-artinchip.c
++++ b/drivers/spi/spi-artinchip.c
+@@ -1449,7 +1449,7 @@
+ 	if (aicspi->bit_mode) {
+ 		spi_ctlr_set_work_mode(aicspi->base_addr, BTC_BIT_WM_BIT_3WIRE);
+ 		/* set chip select number */
+-		spi_ctlr_bit_mode_set_cs_num(spi->chip_select,
++		spi_ctlr_bit_mode_set_cs_num(spi_get_chipselect(spi, 0),
+ 					     aicspi->base_addr);
+ 		if (spi->mode & SPI_CS_HIGH)
+ 			spi_ctlr_bit_mode_set_cs_pol(aicspi, true);
+@@ -1459,7 +1459,7 @@
+ 		spi_ctlr_set_work_mode(aicspi->base_addr, BTC_BIT_WM_BYTE);
+ 		spi_cltr_cfg_tc(spi->mode, aicspi->base_addr);
+ 		/* set chip select number */
+-		spi_ctlr_set_cs_num(spi->chip_select, aicspi->base_addr);
++		spi_ctlr_set_cs_num(spi_get_chipselect(spi, 0), aicspi->base_addr);
+ 		if (spi->mode & SPI_CS_HIGH)
+ 			spi_ctlr_set_cs_pol(aicspi, true);
+ 		else
