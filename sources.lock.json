@@ -1,0 +1,12 @@
+{
+  "buildroot": {
+    "version": "2026.08.1",
+    "commit": "7fdeadb3b9f12f78e5fccca914d7fef47090ab9a",
+    "url": "https://buildroot.org/downloads/buildroot-2026.08.1.tar.xz",
+    "sha256": "34fb7bea8a213ffde39cc02e61703391560f26e0850f03138c722d0b09880f2b"
+  },
+  "source_date_epoch": 1767225600,
+  "baseline_kernel": "6.18.7",
+  "experimental_kernel": "7.3.5",
+  "opensbi": "1.6"
+}

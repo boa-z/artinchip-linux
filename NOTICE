@@ -1,0 +1,13 @@
+Original scripts and documentation: MIT, Copyright 2026 boa-z.
+
+configs/qemu_riscv64*_defconfig and board/qemu/patches/*/*.hash are derived
+from Buildroot 2026.08.1 (GPL-2.0-or-later). Their upstream source is
+https://github.com/buildroot/buildroot/tree/7fdeadb3b9f12f78e5fccca914d7fef47090ab9a
+at configs/qemu_riscv64_virt_defconfig and board/qemu/patches/.
+The Linux 7.3.5 hash is from the kernel.org published checksum list.
+The corresponding license text is in LICENSES/GPL-2.0-or-later.txt.
+
+No source code from Luban or d211-linux-6.18 is incorporated in M0.
+Research references retain their original licenses. Linux, BusyBox,
+OpenSBI, Buildroot and toolchain downloads are separately licensed;
+the repository's MIT license does not apply to them.
