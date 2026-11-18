@@ -1,2 +1,2 @@
-# Unified patches contain a space prefix even on empty context lines.
-*.patch whitespace=-blank-at-eol
+# Unified patch context has a mandatory leading space, including empty lines.
+*.patch whitespace=-space-before-tab,-blank-at-eol
