@@ -1,0 +1,8 @@
+{
+  "boot_os": "no",
+  "bootdelay": "3",
+  "boot_partition": "kernel",
+  "earlycon": "uart8250,mmio32,0x18710000,115200",
+  "set_commonargs": "setenv bootargs console=ttyS0,115200n8 earlycon=${earlycon} keep_bootcon ignore_loglevel loglevel=8 init=/linuxrc firmware_class.path=/etc/firmware",
+  "nand_boot": "echo Boot experimental Linux from NAND; if test ${boot_partition} = kernel; then run set_nand_bootargs; loadknl mtd kernel ${knl_addr}; else run set_nand_bootargs_recovery; loadknl mtd recovery ${knl_addr}; fi; bootm ${knl_addr};"
+}

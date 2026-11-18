@@ -42,6 +42,49 @@ class FirmwareChecks(unittest.TestCase):
         data[2560:] = payload
         return data
 
+    def system_image(self, overrides=None):
+        targets = {'rootfs': 'ubiroot:rootfs', 'kernel': 'kernel', 'spl': 'spl',
+                   'uboot': 'uboot', 'env': 'env;env_r', 'logo': 'logo'}
+        targets.update(overrides or {})
+        payload = b'fixture, never firmware'
+        start = 2048 + 512 * len(targets)
+        data = bytearray(start + len(targets) * len(payload))
+        data[:8] = b'AIC.FW\0\0'
+        data[200:208] = b'spi-nand'
+        struct.pack_into('<IIII', data, 332, 2048, 512 * len(targets), start, len(targets) * len(payload))
+        for i, (name, target) in enumerate(targets.items()):
+            offset = 2048 + 512 * i
+            data[offset:offset + 8] = b'META\0\0\0\0'
+            label = ('image.target.' + name).encode()
+            data[offset + 8:offset + 8 + len(label)] = label
+            data[offset + 72:offset + 72 + len(target)] = target.encode()
+            pos = start + i * len(payload)
+            struct.pack_into('<III', data, offset + 136, pos, len(payload), zlib.crc32(payload))
+            data[pos:pos + len(payload)] = payload
+        return data
+
+    def test_system_update_requires_explicit_verifier_policy(self):
+        self.path.write_bytes(self.system_image())
+        with self.assertRaises(ValueError):
+            fw.verify_image(self.path)
+        result = fw.verify_image(self.path, allow_system_update=True)
+        self.assertTrue(result['system_update'])
+        self.assertFalse(result['recovery_targeted'])
+
+    def test_system_policy_still_rejects_recovery_and_device_data(self):
+        for protected in ('recovery', 'bbt', 'userid', 'falcon', 'ubisystem:user'):
+            self.path.write_bytes(self.system_image({'kernel': protected}))
+            with self.subTest(target=protected), self.assertRaisesRegex(ValueError, 'protected'):
+                fw.verify_image(self.path, allow_system_update=True)
+
+    def test_system_policy_rejects_incomplete_and_wrong_env_targets(self):
+        self.path.write_bytes(self.image())
+        with self.assertRaisesRegex(ValueError, 'requires SPL'):
+            fw.verify_image(self.path, allow_system_update=True)
+        self.path.write_bytes(self.system_image({'env': 'env;recovery'}))
+        with self.assertRaisesRegex(ValueError, 'protected'):
+            fw.verify_image(self.path, allow_system_update=True)
+
     def test_factory_layout_and_root_index(self):
         parts = fw.partitions()
         self.assertEqual(list(parts).index('ubiroot'), 10)

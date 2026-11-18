@@ -182,3 +182,36 @@ actual workflow result. Earlier M0/M1 CI evidence above remains historical.
 
 See [the bilingual M2 operator guide](m2-early-boot-debug.md). Next hardware
 tests must use microSD fatload + bootm into RAM, without saveenv or NAND writes.
+
+# Single-file experimental system installer
+
+The board workflow for M2 commit `725f95feb383aab1ec7f243a5fd6131fe979b066`
+subsequently completed successfully:
+https://github.com/boa-z/artinchip-linux/actions/runs/44300874852.
+This supersedes the initial authentication/CI blocker above for that commit.
+It remains software evidence, not Linux 6.18 hardware boot evidence.
+
+At the operator's subsequent request for one flashable image, an explicit
+`firmware.py pack --system-update` mode was added. It includes persistent
+SPL/U-Boot (with vendor OpenSBI 0.9)/env+env_r/logo/kernel/rootfs targets while
+preserving Recovery, BBT, userid, Falcon bytes and ubisystem:user. It uses the
+M2 0x40200000 diagnostic kernel, not the old 0x40000000 control. The new boot
+environment selects normal U-Boot, omits falcon_save and enables console logs.
+There is still no physical verification of these rebuilt boot components or
+of the replacement Linux 6.18 kernel. Do not call it a validated bootable release.
+
+Native software results: 26 tests passed with no skips; real full-system
+packaging and explicit system verification passed; all artifact SHA256SUMS
+verified; selective rootfs-only and kernel+rootfs packaging regressions passed.
+The system verifier rejects protected partitions even in its expanded mode,
+requires the full target set and exact redundant environment mapping, and the
+packer rejects differing OpenSBI payloads between kernel FIT and boot manifest.
+The workflow now additionally reproduces this system package; its result must
+be checked separately from the already-passing M2 workflow above.
+
+The local `.img` is under `artifacts/d213ecv-linux618-system-update/`, alongside
+its source/component/environment manifest, SHA256SUMS and standalone guide.
+[System update and OpenSBI upgrade analysis](system-update.md) describes the
+write scope, experimental hardware status and the reviewed upstream v1.9
+compatibility gaps. It is intended for an existing factory-layout board with
+Recovery present, not a full-chip erase/blank-NAND Recovery reconstruction.

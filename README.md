@@ -59,6 +59,11 @@ the kernel does not require upgrading the userspace ABI baseline. Neither
 profile is considered verified until its actual build and boot checks pass.
 See [validation](docs/validation.md) for recorded evidence and limitations.
 
+A single-file experimental board system installer is documented in
+[System update and OpenSBI status](docs/system-update.md). It installs the normal
+boot components and Linux/rootfs while preserving the existing Recovery and device
+data. Linux 6.18 physical boot remains unverified.
+
 ## Outputs and automation
 
 Build trees and serial logs live in `output/<profile>/`; collected firmware,

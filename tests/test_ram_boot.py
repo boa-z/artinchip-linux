@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from riscv_image import parse_image, check_layout
 from boot_contract import check_config, check_dtb
-from firmware import check_fit
+from firmware import check_fit, system_update_env
 
 
 def image_fixture():
@@ -122,6 +122,14 @@ class BuiltFitChecks(unittest.TestCase):
         subprocess.run(['fdtput', '-t', 'x', str(self.fit), '/images/kernel', 'load', '40400000'], check=True)
         with self.assertRaisesRegex(ValueError, 'entry must equal load'):
             check_fit(self.fit, require_hashes=True)
+
+    def test_system_update_env_preserves_layout_and_disables_falcon(self):
+        output = self.tmp / 'env.bin'
+        result = system_update_env(BOOT.parent / 'env.bin', output)
+        self.assertEqual(result['partition_layout'], 'factory')
+        self.assertEqual(result['overrides']['boot_os'], 'no')
+        self.assertNotIn('falcon_save', result['overrides']['nand_boot'])
+        self.assertIn('console=ttyS0', result['overrides']['set_commonargs'])
 
     def test_cpu_uart_memory_and_required_config(self):
         dtb = self.tmp / 'board.dtb'

@@ -162,7 +162,7 @@ def check_env(path):
     return {'crc': 'passed', 'partition_layout': 'factory', 'root_mtd': 10}
 
 
-def verify_image(path):
+def verify_image(path, allow_system_update=False):
     data = path.read_bytes()
     require(len(data) >= 2048, 'Truncated firmware header')
     require(data[:8].rstrip(b'\0') == b'AIC.FW', 'Invalid AiBurn image magic')
@@ -173,6 +173,9 @@ def verify_image(path):
     require(file_start + file_length == len(data), 'Truncated or extended firmware data')
     records = []
     allowed = {'image.target.rootfs': 'ubiroot:rootfs', 'image.target.kernel': 'kernel'}
+    if allow_system_update:
+        allowed.update({'image.target.spl': 'spl', 'image.target.uboot': 'uboot',
+                        'image.target.env': 'env;env_r', 'image.target.logo': 'logo'})
     updaters = {'image.updater.' + n for n in ('ddr', 'env', 'uboot', 'logo', 'spl')}
     seen = set()
     for offset in range(start, start + length, 512):
@@ -193,17 +196,40 @@ def verify_image(path):
         require(zlib.crc32(data[pos:pos + size]) == crc, 'Component CRC mismatch')
         if name in allowed:
             require(part == allowed[name], 'Update targets a protected or unknown partition')
-            maximum = partitions()[part.split(':')[0]]['size']
+            maximum = min(partitions()[n.split(':')[0]]['size'] for n in part.split(';'))
             require(size <= maximum, 'Component exceeds its NAND partition')
         else:
             require(part == '', 'RAM updater or header targets a NAND partition')
         records.append({'name': name, 'partition': part, 'bytes': size})
     require('image.target.rootfs' in seen, 'No rootfs update in firmware')
-    return {'components': records, 'recovery_targeted': False, 'sha256': sha256(path)}
+    if allow_system_update:
+        require(set(allowed).issubset(seen), 'System update requires SPL, U-Boot, both environments, logo, kernel and rootfs')
+    return {'components': records, 'recovery_targeted': False,
+            'system_update': allow_system_update, 'sha256': sha256(path)}
+
+
+def system_update_env(source, destination):
+    """Derive a debuggable normal-U-Boot environment; preserve factory layout."""
+    check_env(source)
+    values = {}
+    for item in source.read_bytes()[5:].split(b'\0'):
+        if b'=' in item:
+            key, value = item.split(b'=', 1)
+            values[key.decode()] = value.decode()
+    overrides = json.loads((BOARD / 'system-update-env.json').read_text())
+    values.update(overrides)
+    text = destination.with_suffix('.txt')
+    text.write_text(''.join(f'{k}={v}\n' for k, v in sorted(values.items())))
+    subprocess.run(['mkenvimage', '-r', '-s', '0x4000', '-o', str(destination), str(text)], check=True)
+    result = check_env(destination)
+    result.update(overrides=overrides, sha256=sha256(destination))
+    return result
 
 
 def pack(args):
     parts = partitions()
+    system_update = getattr(args, 'system_update', False)
+    require(not system_update or args.kernel, 'System update requires a kernel FIT')
     components = args.components.resolve()
     provenance = json.loads((components / 'components.json').read_text())
     require(provenance['board'] == LAYOUT['board'], 'Components are for another board')
@@ -220,17 +246,30 @@ def pack(args):
             require((components / name).stat().st_size <= parts[partition]['size'], 'Oversized boot component')
     if args.kernel:
         fits['kernel.itb'] = check_fit(args.kernel, require_hashes=True)
+        if system_update:
+            sbi = [r for r in fits['kernel.itb']['images'] if r['type'] == 'firmware']
+            require(len(sbi) == 1 and sbi[0]['sha256'] == provenance['sha256']['fw_dynamic.bin'],
+                    'Kernel FIT OpenSBI differs from bundled U-Boot firmware')
     args.output.mkdir(parents=True, exist_ok=True)
     require(not any(args.output.glob('*.img')), 'Use a fresh output directory for a new package')
     with tempfile.TemporaryDirectory(dir=args.output, prefix='staging-') as tmp:
         stage = Path(tmp)
         for name in names:
             shutil.copyfile(components / name, stage / name)
+        if system_update:
+            environment = system_update_env(components / 'env.bin', stage / 'env.bin')
         shutil.copyfile(args.rootfs, stage / 'rootfs_page_2k_block_128k.ubifs')
         target = {'rootfs': {'file': 'rootfs*.ubifs', 'attr': ['ubi', 'required'], 'part': ['ubiroot:rootfs']}}
         if args.kernel:
             shutil.copyfile(args.kernel, stage / 'kernel.itb')
             target['kernel'] = {'file': 'kernel.itb', 'attr': ['mtd', 'required'], 'part': ['kernel']}
+        if system_update:
+            for key, filename, targets in (
+                    ('spl', 'u-boot-spl-dtb.aic', ['spl']),
+                    ('uboot', 'u-boot.itb', ['uboot']),
+                    ('env', 'env.bin', ['env', 'env_r']),
+                    ('logo', 'logo.itb', ['logo'])):
+                target[key] = {'file': filename, 'attr': ['mtd', 'required'], 'part': targets}
         cfg = {'spi-nand': {'size': '128m', 'partitions': {}}, 'image': {
             'info': {'platform': 'd211', 'product': 'demo128_nand', 'version': '1.0.0',
                      'media': {'type': 'spi-nand', 'device_id': 0,
@@ -253,14 +292,16 @@ def pack(args):
                         '-d', str(stage), '-c', str(stage / 'image_cfg.json'), '-o', str(stage)], check=True)
         images = list(stage.glob('*.img'))
         require(len(images) == 1, 'Vendor packer did not produce exactly one NAND image')
-        result = verify_image(images[0])
-        final = args.output / 'd213ecv-demo128-nand.img'
+        result = verify_image(images[0], allow_system_update=system_update)
+        final = args.output / ('d213ecv-linux618-system-update.img' if system_update else 'd213ecv-demo128-nand.img')
         shutil.copyfile(images[0], final)
         shutil.copyfile(stage / 'image_cfg.json', args.output / 'image_cfg.json')
     commit = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip()
     dirty = bool(subprocess.check_output(['git', '-C', str(ROOT), 'status', '--porcelain'], text=True))
     manifest = {'board': LAYOUT['board'], 'vendor_compatibility_name': LAYOUT['vendor_profile'],
                 'project_commit': commit, 'working_tree_dirty': dirty,
+                'image_kind': 'experimental-system-update' if system_update else 'selective-update',
+                'boot_environment': environment,
                 'kernel_policy': 'experimental_6_18' if args.kernel else 'retain_factory_5_10',
                 'buildroot_source': json.loads((ROOT / 'sources.lock.json').read_text())['buildroot'],
                 'kernel_source': (json.loads((BOARD / 'vendor-sources.json').read_text())['kernel_reference']
@@ -269,6 +310,8 @@ def pack(args):
                 'component_provenance': provenance, 'packaging': 'passed',
                 'hardware_boot': 'not_verified', 'recovery_policy': 'never targeted'}
     (args.output / 'firmware-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    if system_update:
+        shutil.copyfile(ROOT / 'docs/system-update.md', args.output / 'README.md')
     (args.output / 'SHA256SUMS').write_text(''.join(f'{sha256(p)}  {p.name}\n' for p in sorted(args.output.iterdir())
                                                 if p.is_file() and p.name != 'SHA256SUMS'))
     print('Packaging passed; hardware boot is NOT verified.')
@@ -281,17 +324,25 @@ def main():
     for name in ('rootfs', 'fit', 'verify'):
         p = sub.add_parser(name)
         p.add_argument('path', type=Path)
+        if name == 'verify':
+            p.add_argument('--system-update', action='store_true',
+                           help='Explicitly verify the complete system-update target set')
     p = sub.add_parser('pack')
     p.add_argument('--components', type=Path, required=True)
     p.add_argument('--rootfs', type=Path, required=True)
     p.add_argument('--kernel', type=Path)
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--system-update', action='store_true',
+                   help='Update SPL/U-Boot/env/logo/kernel/rootfs; preserve Recovery and device data')
     args = parser.parse_args()
     if args.command == 'pack':
         pack(args)
     else:
         fn = {'layout': partitions, 'rootfs': check_rootfs, 'fit': check_fit, 'verify': verify_image}[args.command]
-        print(json.dumps(fn() if args.command == 'layout' else fn(args.path), indent=2))
+        result = (fn() if args.command == 'layout' else
+                  fn(args.path, allow_system_update=args.system_update) if args.command == 'verify' else
+                  fn(args.path))
+        print(json.dumps(result, indent=2))
 
 
 if __name__ == '__main__':

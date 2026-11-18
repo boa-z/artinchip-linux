@@ -87,6 +87,17 @@ jobs:
           JOBS=6 python3 scripts/ram-debug.py --diagnostic
           (cd artifacts/d213ecv-linux618-ram-debug && sha256sum -c SHA256SUMS)
           python3 -m unittest discover -s tests -v
+      - name: Package complete experimental system update (preserve Recovery)
+        run: |
+          export PATH="$PWD/output/d213ecv-demo128-nand/host/bin:$PATH"
+          .cache/firmware-venv/bin/python scripts/firmware.py pack --system-update \
+            --components .cache/vendor-boot/components \
+            --kernel artifacts/d213ecv-linux618-ram-debug/diagnostic-40200000.itb \
+            --rootfs output/d213ecv-demo128-nand-linux618/images/rootfs.ubifs \
+            --output artifacts/d213ecv-linux618-system-update
+          python3 scripts/firmware.py verify --system-update \
+            artifacts/d213ecv-linux618-system-update/d213ecv-linux618-system-update.img
+          (cd artifacts/d213ecv-linux618-system-update && sha256sum -c SHA256SUMS)
       - name: Upload software evidence (Linux 6.18 hardware boot remains unverified)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
