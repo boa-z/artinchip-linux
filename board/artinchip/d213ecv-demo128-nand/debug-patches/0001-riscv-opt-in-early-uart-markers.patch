@@ -1,0 +1,186 @@
+From: boa-z
+Subject: [PATCH] riscv: add opt-in D213ECV bounded early UART stage markers
+
+Project-local RAM debug instrumentation for pinned Linux d8e6fff434d6.
+License: GPL-2.0-only. Default off; not proposed as upstream architecture API.
+Physical UART before MMU; dedicated fixmap afterwards, no SBI dependency.
+
+--- a/arch/riscv/Kconfig.debug
++++ b/arch/riscv/Kconfig.debug
+@@ -1 +1,10 @@
+ source "arch/riscv/kernel/tests/Kconfig.debug"
++
++config D213ECV_EARLY_DEBUG
++	bool "D213ECV RAM-only early UART stage markers"
++	depends on ARCH_ARTINCHIP && MACH_D211 && 64BIT && MMU && !RISCV_M_MODE
++	default n
++	help
++	  Debug only: use the bootloader-initialized UART0, without changing
++	  clocks or pins. Bounded polling; dedicated fixmap after MMU enable.
++	  Never enable in production kernels.
+--- a/arch/riscv/include/asm/fixmap.h
++++ b/arch/riscv/include/asm/fixmap.h
+@@ -37,6 +37,9 @@
+ 	FIX_TEXT_POKE1,
+ 	FIX_TEXT_POKE0,
+ 	FIX_EARLYCON_MEM_BASE,
++#ifdef CONFIG_D213ECV_EARLY_DEBUG
++	FIX_M2_UART,
++#endif
+ 
+ 	__end_of_permanent_fixed_addresses,
+ 	/*
+--- a/arch/riscv/mm/init.c
++++ b/arch/riscv/mm/init.c
+@@ -36,6 +36,11 @@
+ #include <asm/tlbflush.h>
+ 
+ #include "../kernel/head.h"
++
++#ifdef CONFIG_D213ECV_EARLY_DEBUG
++/* Loaded by head.S only after relocation; not a physical MMIO pointer. */
++unsigned long m2_uart_va;
++#endif
+ 
+ u64 new_vmalloc[NR_CPUS / sizeof(u64) + 1];
+ 
+@@ -1287,6 +1292,11 @@
+ 	}
+ #endif
+ 
++#ifdef CONFIG_D213ECV_EARLY_DEBUG
++	m2_uart_va = __fix_to_virt(FIX_M2_UART);
++	create_pte_mapping(fixmap_pte, m2_uart_va,
++			   0x18710000, PAGE_SIZE, PAGE_KERNEL_IO);
++#endif
+ 	pt_ops_set_fixmap();
+ }
+ 
+--- a/arch/riscv/kernel/head.S
++++ b/arch/riscv/kernel/head.S
+@@ -16,6 +16,7 @@
+ #include <asm/scs.h>
+ #include <asm/xip_fixup.h>
+ #include "efi-header.S"
++#include <asm/m2-debug.h>
+ 
+ __HEAD
+ SYM_CODE_START(_start)
+@@ -201,6 +202,7 @@
+ SYM_CODE_END(_start)
+ 
+ SYM_CODE_START(_start_kernel)
++	m2_mark 0, 0
+ 	/* Mask all interrupts */
+ 	csrw CSR_IE, zero
+ 	csrw CSR_IP, zero
+@@ -318,11 +320,13 @@
+ 	/* Set trap vector to spin forever to help debug */
+ 	la a3, .Lsecondary_park
+ 	csrw CSR_TVEC, a3
++	m2_mark 1, 0
+ 	call setup_vm
+ #ifdef CONFIG_MMU
+ 	la a0, early_pg_dir
+ 	XIP_FIXUP_OFFSET a0
+ 	call relocate_enable_mmu
++	m2_mark 2, 1
+ #endif /* CONFIG_MMU */
+ 
+ 	call .Lsetup_trap_vector
+@@ -336,7 +340,9 @@
+ 	call kasan_early_init
+ #endif
+ 	/* Start the kernel */
++	m2_mark 3, 1
+ 	call soc_early_init
++	m2_mark 4, 1
+ 	tail start_kernel
+ 
+ #ifdef CONFIG_RISCV_BOOT_SPINWAIT
+--- a/drivers/tty/serial/earlycon.c
++++ b/drivers/tty/serial/earlycon.c
+@@ -1,3 +1,6 @@
++#ifdef CONFIG_D213ECV_EARLY_DEBUG
++#include <asm/m2-debug.h>
++#endif
+ // SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (C) 2014 Linaro Ltd.
+@@ -159,6 +162,9 @@
+ 		return -ENODEV;
+ 
+ 	register_console(early_console_dev.con);
++#ifdef CONFIG_D213ECV_EARLY_DEBUG
++	m2_console_mark();
++#endif
+ 	return 0;
+ }
+ 
+@@ -347,6 +353,9 @@
+ 
+ 
+ 	register_console(early_console_dev.con);
++#ifdef CONFIG_D213ECV_EARLY_DEBUG
++	m2_console_mark();
++#endif
+ 	return 0;
+ }
+ 
+--- /dev/null
++++ b/arch/riscv/include/asm/m2-debug.h
+@@ -0,0 +1,54 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef _ASM_RISCV_M2_DEBUG_H
++#define _ASM_RISCV_M2_DEBUG_H
++#ifdef __ASSEMBLY__
++/* Only t0-t3 are scratched; a0/a1, ra, sp and callee-saved registers survive.
++ * No calls, stack, SBI, clocks or pinmux writes. Each byte polls at most 65536
++ * times. A bus fault or a stalled interconnect still requires hardware reset.
++ */
++.macro m2_byte value, virt
++#ifdef CONFIG_D213ECV_EARLY_DEBUG
++	.if \virt
++	la t0, m2_uart_va
++	REG_L t0, 0(t0)
++	.else
++	li t0, 0x18710000
++	.endif
++	li t1, 65536
++.Lm2_wait\@:
++	lw t2, 20(t0)
++	andi t2, t2, 0x20
++	bnez t2, .Lm2_send\@
++	addi t1, t1, -1
++	bnez t1, .Lm2_wait\@
++	j .Lm2_done\@
++.Lm2_send\@:
++	li t3, \value
++	sw t3, 0(t0)
++	fence iorw, iorw
++.Lm2_done\@:
++#endif
++.endm
++.macro m2_mark stage, virt
++	m2_byte 69, \virt
++	m2_byte (48 + \stage), \virt
++	m2_byte 13, \virt
++	m2_byte 10, \virt
++.endm
++#else
++#include <linux/io.h>
++#include <asm/fixmap.h>
++static inline void m2_console_mark(void)
++{
++	void __iomem *uart = (void __iomem *)__fix_to_virt(FIX_M2_UART);
++	const char *p;
++	for (p = "E5\r\n"; *p; p++) {
++		unsigned int budget = 65536;
++		while (budget && !(readl(uart + 20) & 0x20))
++			budget--;
++		if (budget)
++			writel(*p, uart);
++	}
++}
++#endif
++#endif

@@ -11,7 +11,10 @@ are documented in [the hardware bring-up guide](docs/m1-d213ecv.md).
 
 M0 provides a verified RISC-V 64-bit QEMU development baseline. M1 adds independent
 board rootfs/kernel profiles and recovery-preserving AiBurn packaging. Physical
-board boot remains unverified until serial evidence is recorded. Multimedia,
+board Linux 5.10.44 with the independent rootfs has passed operator-reported
+hardware tests. Linux 6.18 currently stops after U-Boot handoff; use the
+[SD/RAM early-boot debug guide](docs/m2-early-boot-debug.md) for controlled
+address comparisons and optional UART stage markers. Multimedia,
 DRM/KMS and OTA remain outside the current bring-up work.
 
 ## Quick start

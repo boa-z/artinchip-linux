@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Optional RAM diagnostic build ONLY; preserve the M1 normal profile.
+CONFIG_D213ECV_EARLY_DEBUG=y
+# OpenSBI 0.9 has the legacy console, not the later DBCN extension.
+CONFIG_RISCV_SBI_V01=y

@@ -18,7 +18,7 @@ concurrency:
 jobs:
   software:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -82,7 +82,12 @@ jobs:
             --components .cache/vendor-boot/components --kernel artifacts/kernel-6.18.itb \
             --rootfs output/d213ecv-demo128-nand-linux618/images/rootfs.ubifs \
             --output artifacts/d213ecv-linux618-update
-      - name: Upload software evidence (hardware boot remains unverified)
+      - name: Build SD RAM address controls and opt-in early UART diagnostics
+        run: |
+          JOBS=6 python3 scripts/ram-debug.py --diagnostic
+          (cd artifacts/d213ecv-linux618-ram-debug && sha256sum -c SHA256SUMS)
+          python3 -m unittest discover -s tests -v
+      - name: Upload software evidence (Linux 6.18 hardware boot remains unverified)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

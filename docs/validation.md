@@ -119,3 +119,66 @@ build step. Its current result and the overall workflow result are **pending**,
 not passed. The earlier Linux 7.3.5 success in run `44123924925` remains valid
 historical evidence, but it does not establish this latest run's outcome. The
 separate M1 board workflow above is complete and successful.
+
+# M2 SD/RAM early boot investigation
+
+The operator subsequently reported physical M1 success with vendor Linux
+5.10.44 + the independent Buildroot rootfs: NAND/UBI/UBIFS, BusyBox, file I/O
+and reboot persistence passed. This updates the earlier hardware-pending
+statements above for that combination only. Linux 6.18.52 still has no observed
+Linux output after U-Boot `Starting kernel ...`. The operator's FIT hash checks
+and loading/decompression success establish handoff progress, not a Linux boot.
+
+Native M2 software verification on 2026-11-18:
+
+- A separate diagnostic kernel built from the SHA-checked pinned archive with
+  versioned patches using six compiler jobs. Only D213ECV_EARLY_DEBUG and
+  RISCV_SBI_V01 differ from the M1 final config. Normal M1 kernel, DTB and
+  rootfs outputs were not overwritten. Inherited vendor driver/DTS warnings
+  remain; this is not a DT schema or runtime-driver validation pass.
+- 22 tests passed, none skipped, including real FIT payload corruption for
+  Kernel/OpenSBI/DTB, mutated load/entry, built-in UART requirements, DTB
+  checks, runtime-overlap rejection and emitted E0 register/stack checks.
+- Manual linked-head disassembly confirmed physical UART access before MMU
+  and m2_uart_va loads after relocation, and marker placement around setup_vm,
+  relocate_enable_mmu, soc_early_init and start_kernel.
+- Python compile checks, shell syntax and git whitespace checks passed.
+- Both M1 rootfs-only and legacy kernel+rootfs AiBurn packaging passed again
+  using existing native Buildroot outputs. These were software regression
+  packages, not instructions to flash NAND for M2.
+- M0 baseline artifact replay again produced `QEMU smoke test PASS`.
+- All generated RAM bundle SHA256SUMS entries verified. The baseline FIT is
+  byte-identical to the retained original `artifacts/kernel-6.18.itb`.
+  Baseline/offset use identical compressed kernel, final config and DTB.
+
+| RAM debug FIT | SHA256 |
+| --- | --- |
+| baseline-40000000.itb | `2f4a5eee7ca058b29cf59cafa808ec1e982660f0a8e478e885ed9731de87463c` |
+| offset-40200000.itb | `c7a788db0dd8b6cfd2ea88e0fe7b7e4632e2c19a418b54bf60100531aa960222` |
+| diagnostic-40200000.itb | `6cc840a00b76d5a00e5352359bc359d310b291d636b6ade275688252c07daebc` |
+
+The baseline Image has text_offset=0x200000, image_size=11227136 and file
+size=10913280. At candidate 0x40200000 its runtime extent is
+[0x40200000,0x40cb5000), below the actual FIT buffer
+[0x41200000,0x417a2911). DDR is [0x40000000,0x48000000).
+Both addresses satisfy RV64 PMD alignment; the offset is not established as
+the hardware failure cause. A confirmed console configuration defect is the
+loss of the vendor 5.10 SBI v0.1 default in 6.18, preventing earlycon=sbi with
+OpenSBI 0.9. The optional diagnostic configuration enables that fallback.
+MMIO silence and the exact early failure instruction still require hardware.
+
+Local bundles record the pre-M2 HEAD plus working_tree_dirty=true and actual
+source/config/ELF/input hashes, rather than falsely claiming a clean build at
+a later commit. Existing baseline intermediates are identified by content
+hash; they were intentionally reused. The workflow now builds all three RAM
+variants and runs the same checks on a clean runner, alongside the M1 packages.
+
+**M2 CI has not run:** startup `gh auth status` reported invalid existing boa-z
+credentials and `gh api user` returned HTTP 401. No GitHub write was attempted;
+no account was switched or new credential created. Local validation cannot be
+reported as GitHub Actions success. Restore the existing boa-z authentication,
+verify the identity, then push the authorized main commit and inspect the
+actual workflow result. Earlier M0/M1 CI evidence above remains historical.
+
+See [the bilingual M2 operator guide](m2-early-boot-debug.md). Next hardware
+tests must use microSD fatload + bootm into RAM, without saveenv or NAND writes.

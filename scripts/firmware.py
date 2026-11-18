@@ -82,6 +82,8 @@ def check_fit(path, require_hashes=False):
         if prop in properties:
             require(all(n in names for n in fdtget(path, conf, prop).split()), 'Broken FIT image reference')
     records = []
+    kernel_contract = None
+    board_contract = None
     with tempfile.TemporaryDirectory() as tmp:
         for index, name in enumerate(names):
             node = '/images/' + name
@@ -105,6 +107,23 @@ def check_fit(path, require_hashes=False):
                           else hashlib.new(algo, data).digest())
                 require(actual == value, 'FIT payload hash mismatch')
             records.append({'name': name, 'type': kind, 'hashes': len(hashes), 'sha256': sha256(payload)})
+            if kind == 'kernel' and fdtget(path, node, 'arch') == 'riscv':
+                import gzip
+                from riscv_image import parse_image
+                compression = fdtget(path, node, 'compression')
+                require(compression in ('gzip', 'none'), 'Unsupported kernel compression')
+                raw = gzip.decompress(payload.read_bytes()) if compression == 'gzip' else payload.read_bytes()
+                kernel_contract = (parse_image(raw), int(fdtget(path, node, 'load', 'x'), 16),
+                                   int(fdtget(path, node, 'entry', 'x'), 16))
+            if kind == 'flat_dt' and 'kernel' in properties:
+                from boot_contract import check_dtb
+                board_contract = check_dtb(payload)
+    if kernel_contract:
+        from riscv_image import check_layout
+        require(board_contract is not None, 'Missing board DTB contract')
+        header, load, entry = kernel_contract
+        check_layout(header, load, entry, path.stat().st_size, baseline=load == 0x40000000,
+                     extra_reserved=board_contract['reserved'])
     return {'default_configuration': default, 'images': records,
             'legacy_without_hashes': any(r['hashes'] == 0 for r in records)}
 
