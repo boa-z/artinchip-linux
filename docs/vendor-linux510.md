@@ -58,3 +58,23 @@ SPL、U-Boot（含 OpenSBI）、env、env_r、logo、kernel 与 `ubiroot:rootfs`
 保留 Recovery、BBT、userid、Falcon 及 `ubisystem:user`，禁止整片擦除或重新分区。
 请备份自定义 U-Boot 环境，并备好原厂镜像。更新环境默认使用正常 U-Boot 启动路径，
 支持进入原有 Recovery。失败时先复位保存完整串口日志，再按原厂流程恢复。
+
+### AiBurn loses the device after `image.updater.spl`
+
+The USB Boot ROM passes execution to the downloaded SPL. AiBurn then waits
+for the U-Boot USB gadget to enumerate. The handoff can interrupt the final
+USB response. `Dev ... lost` means the host timed out waiting for the gadget.
+A log containing only `image.updater.*` shows RAM transfers. The updated
+package uses the original vendor RAM environment, including `bootdelay=-3`,
+and applies the normal boot settings to the NAND `env` and `env_r` payload.
+
+若在 `Wait to reconnect` 后约 10 秒出现 `Dev ... lost`，先结束本次烧录，断电重进
+USB 下载模式。将新 `.img` 复制到 Windows 本地磁盘，核对 SHA256，使用直连
+USB 数据线重试。串口从开始烧录前就记录。观察是否打印
+`Run USB upgrade program`，并查看设备管理器是否出现 `USB\VID_33C3&PID_6677`。
+
+如果仍然掉线，用已验证的原厂 AiBurn 镜像对照。若原系统还能正常进入 U-Boot，
+也可先按上面的 microSD 流程验证内核。请保留完整的 UART 和 AiBurn 日志、AiBurn
+版本及观察到的 USB 设备 ID。若串口进入 USB 升级程序且设备已枚举，优先检查
+Windows 驱动、设备绑定或虚拟机 USB 直通。若串口停在更早的位置，最后一行可用于
+定位 SPL、OpenSBI 或 U-Boot 的启动阶段。

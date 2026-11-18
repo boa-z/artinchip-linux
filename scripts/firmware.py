@@ -203,7 +203,8 @@ def verify_image(path, allow_system_update=False):
             require(size <= maximum, 'Component exceeds its NAND partition')
         else:
             require(part == '', 'RAM updater or header targets a NAND partition')
-        records.append({'name': name, 'partition': part, 'bytes': size})
+        records.append({'name': name, 'partition': part, 'bytes': size,
+                        'sha256': hashlib.sha256(data[pos:pos + size]).hexdigest()})
     require('image.target.rootfs' in seen, 'No rootfs update in firmware')
     if allow_system_update:
         require(set(allowed).issubset(seen), 'System update requires SPL, U-Boot, both environments, logo, kernel and rootfs')
@@ -266,7 +267,9 @@ def pack(args):
         for name in names:
             shutil.copyfile(components / name, stage / name)
         if system_update:
-            environment = system_update_env(components / 'env.bin', stage / 'env.bin')
+            # USB U-Boot imports the RAM environment before entering aicupg.
+            # Apply normal-boot overrides only to the NAND environment.
+            environment = system_update_env(components / 'env.bin', stage / 'nand-env.bin')
         shutil.copyfile(args.rootfs, stage / 'rootfs_page_2k_block_128k.ubifs')
         target = {'rootfs': {'file': 'rootfs*.ubifs', 'attr': ['ubi', 'required'], 'part': ['ubiroot:rootfs']}}
         if args.kernel:
@@ -276,7 +279,7 @@ def pack(args):
             for key, filename, targets in (
                     ('spl', 'u-boot-spl-dtb.aic', ['spl']),
                     ('uboot', 'u-boot.itb', ['uboot']),
-                    ('env', 'env.bin', ['env', 'env_r']),
+                    ('env', 'nand-env.bin', ['env', 'env_r']),
                     ('logo', 'logo.itb', ['logo'])):
                 target[key] = {'file': filename, 'attr': ['mtd', 'required'], 'part': targets}
         cfg = {'spi-nand': {'size': '128m', 'partitions': {}}, 'image': {
@@ -302,6 +305,12 @@ def pack(args):
         images = list(stage.glob('*.img'))
         require(len(images) == 1, 'Vendor packer did not produce exactly one NAND image')
         result = verify_image(images[0], allow_system_update=system_update)
+        if system_update:
+            payloads = {record['name']: record['sha256'] for record in result['components']}
+            require(payloads.get('image.updater.env') == provenance['sha256']['env.bin'],
+                    'USB updater must use the original RAM environment')
+            require(payloads.get('image.target.env') == environment['sha256'],
+                    'NAND update must use the normal-boot environment')
         filename = ('d213ecv-linux510-system-update.img' if vendor510 else
                     'd213ecv-linux618-system-update.img' if system_update else 'd213ecv-demo128-nand.img')
         final = args.output / filename

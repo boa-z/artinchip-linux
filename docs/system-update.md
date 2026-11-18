@@ -38,7 +38,8 @@ MMIO earlycon and ttyS0 console are explicit, quiet is removed, and nand_boot
 omits falcon_save. The existing Falcon bytes are preserved and not trusted
 for the replacement kernel. Recovery boot selection remains supported by the
 vendor branch in nand_boot. Both environment partitions are deliberately
-replaced; save any board-specific custom environment beforehand.
+replaced; save any board-specific custom environment beforehand. The RAM
+environment used by the USB updater retains the factory settings.
 
 ## Reproduction
 
