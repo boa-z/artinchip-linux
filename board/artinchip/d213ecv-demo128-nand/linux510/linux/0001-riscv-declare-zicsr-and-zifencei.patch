@@ -1,0 +1,25 @@
+From: boa-z <boa-z@outlook.com>
+Subject: [PATCH] riscv: declare Zicsr and Zifencei to the modern toolchain
+
+The pinned GCC 14.3 toolchain defaults to a RISC-V ISA specification
+where these instructions are separate extensions. The vendor kernel
+already uses these instructions. Declare both in the compiler and
+assembler ISA strings without changing the target's instruction set.
+
+Signed-off-by: boa-z <boa-z@outlook.com>
+---
+ arch/riscv/Makefile | 3 +++
+ 1 file changed, 3 insertions(+)
+
+--- a/arch/riscv/Makefile
++++ b/arch/riscv/Makefile
+@@ -49,6 +49,9 @@
+ riscv-march-aflags-$(CONFIG_RISCV_ISA_C)	:= $(riscv-march-aflags-y)c
+ riscv-march-aflags-$(CONFIG_VECTOR)		:= $(riscv-march-aflags-y)v
+ riscv-march-aflags-$(CONFIG_RISCV_ISA_THEAD)	:= $(riscv-march-aflags-y)xthead
++
++riscv-march-cflags-y := $(riscv-march-cflags-y)_zicsr_zifencei
++riscv-march-aflags-y := $(riscv-march-aflags-y)_zicsr_zifencei
+ 
+ KBUILD_CFLAGS += -march=$(riscv-march-cflags-y) -Wa,-march=$(riscv-march-aflags-y)
+ KBUILD_AFLAGS += -march=$(riscv-march-aflags-y)

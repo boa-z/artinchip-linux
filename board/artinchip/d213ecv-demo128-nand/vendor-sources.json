@@ -47,6 +47,14 @@
       "sha256": "b6369eeba0a694636e2b2b60f18974ed748ef8b10168b1238d80528f43a4e22b"
     }
   ],
+  "vendor_kernel": {
+    "repository": "https://github.com/boa-z/luban",
+    "commit": "6812c56d060c7e88e5e5e831a7c915227485b788",
+    "path": "source/linux-5.10",
+    "release": "5.10.44",
+    "license": "GPL-2.0-only WITH Linux-syscall-note (see kernel COPYING and per-file SPDX)",
+    "device_tree": "Vendor U-Boot DTB built for target/d211/demo128_nand/board.dts"
+  },
   "kernel_reference": {
     "repository": "https://github.com/boa-z/d211-linux-6.18",
     "commit": "d8e6fff434d60e0e5198d70296d8d94df548962d",

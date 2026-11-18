@@ -59,6 +59,10 @@ the kernel does not require upgrading the userspace ABI baseline. Neither
 profile is considered verified until its actual build and boot checks pass.
 See [validation](docs/validation.md) for recorded evidence and limitations.
 
+The [vendor Linux 5.10 build](docs/vendor-linux510.md) rebuilds Linux 5.10.44
+and the independent rootfs with the pinned Buildroot toolchain. It produces
+both an SD test FIT and a recovery preserving AiBurn system update.
+
 A single-file experimental board system installer is documented in
 [System update and OpenSBI status](docs/system-update.md). It installs the normal
 boot components and Linux/rootfs while preserving the existing Recovery and device

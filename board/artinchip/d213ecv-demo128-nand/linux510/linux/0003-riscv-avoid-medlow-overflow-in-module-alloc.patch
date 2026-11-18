@@ -1,0 +1,21 @@
+From: boa-z <boa-z@outlook.com>
+Subject: [PATCH] riscv: avoid folding the module area offset into _end
+
+GCC 14 folds the 2 GiB subtraction and the alignment bias into the
+absolute relocation for _end, which places the result outside the
+medlow address range. Materialize the address first and apply the
+same allocation bounds at runtime.
+
+Signed-off-by: boa-z <boa-z@outlook.com>
+---
+--- a/arch/riscv/kernel/module.c
++++ b/arch/riscv/kernel/module.c
+@@ -432,7 +432,7 @@
+ 
+ #if defined(CONFIG_MMU) && defined(CONFIG_64BIT)
+ #define VMALLOC_MODULE_START \
+-	 max(PFN_ALIGN((unsigned long)&_end - SZ_2G), VMALLOC_START)
++	 max(PFN_ALIGN((unsigned long)RELOC_HIDE(&_end, 0) - SZ_2G), VMALLOC_START)
+ void *module_alloc(unsigned long size)
+ {
+ 	return __vmalloc_node_range(size, 1, VMALLOC_MODULE_START,

@@ -20,6 +20,7 @@ SOURCE = CACHE / ('buildroot-' + LOCK['buildroot']['version'])
 PROFILES = {'baseline': 'qemu_riscv64_defconfig',
             'linux-7.3.5': 'qemu_riscv64_linux_7_3_5_defconfig',
             'd213ecv-demo128-nand': 'd213ecv_demo128_nand_defconfig',
+            'd213ecv-demo128-nand-linux510': 'd213ecv_demo128_nand_linux510_defconfig',
             'd213ecv-demo128-nand-linux618': 'd213ecv_demo128_nand_linux618_defconfig'}
 
 
@@ -109,8 +110,10 @@ def artifacts(output, profile):
     dest.mkdir(parents=True)
     board = profile.startswith('d213ecv-demo128-nand')
     images = ('rootfs.ubifs', 'rootfs.ubi', 'rootfs.tar') if board else ('Image', 'fw_jump.bin', 'rootfs.ext2')
-    kernel = not board or profile.endswith('-linux618')
-    if board and kernel:
+    kernel = not board or profile.endswith(('-linux510', '-linux618'))
+    if profile.endswith('-linux510'):
+        images += ('Image',)
+    if profile.endswith('-linux618'):
         images += ('Image.gz', 'd213ecv-demo128-nand.dtb')
     for name in images:
         shutil.copy2(output / 'images' / name, dest / name)

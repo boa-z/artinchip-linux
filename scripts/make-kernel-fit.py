@@ -18,7 +18,7 @@ from boot_contract import check_dtb
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--kernel', type=Path, required=True, help='Built Image.gz')
+    parser.add_argument('--kernel', type=Path, required=True, help='Built Image or Image.gz')
     parser.add_argument('--dtb', type=Path, required=True)
     parser.add_argument('--opensbi', type=Path, required=True, help='Matching vendor fw_dynamic.bin')
     parser.add_argument('--output', type=Path, required=True)
@@ -29,7 +29,9 @@ def main():
     args = parser.parse_args()
     if args.entry is None:
         args.entry = args.load
-    image = gzip.decompress(args.kernel.read_bytes())
+    packed = args.kernel.read_bytes()
+    compressed = packed.startswith(b'\x1f\x8b')
+    image = gzip.decompress(packed) if compressed else packed
     header = parse_image(image)
     dtb_contract = check_dtb(args.dtb)
     # Default retains the M1 ABI; nondefault addresses must match the header.
@@ -40,18 +42,18 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=args.output.parent) as tmp:
         d = Path(tmp)
-        for source, name in ((args.kernel, 'Image.gz'), (args.dtb, 'board.dtb'), (args.opensbi, 'fw_dynamic.bin')):
+        for source, name in ((args.kernel, 'kernel.bin'), (args.dtb, 'board.dtb'), (args.opensbi, 'fw_dynamic.bin')):
             shutil.copyfile(source, d / name)
         its = '''/dts-v1/;
 / {
-    description = "D213ECV-DEMO-V4-0 Linux 6.18 bring-up";
+    description = "D213ECV-DEMO-V4-0 Linux";
     #address-cells = <1>;
     images {
         kernel {
             description = "Linux";
-            data = /incbin/("Image.gz");
+            data = /incbin/("kernel.bin");
             type = "kernel"; arch = "riscv"; os = "linux";
-            compression = "gzip"; load = <0x40000000>; entry = <0x40000000>;
+            compression = "KERNEL_COMPRESSION"; load = <0x40000000>; entry = <0x40000000>;
             hash-1 { algo = "sha256"; };
         };
         opensbi {
@@ -75,7 +77,7 @@ def main():
 '''
         its = its.replace('load = <0x40000000>; entry = <0x40000000>;',
                           f'load = <0x{args.load:x}>; entry = <0x{args.entry:x}>;')
-        (d / 'kernel.its').write_text(its)
+        (d / 'kernel.its').write_text(its.replace('KERNEL_COMPRESSION', 'gzip' if compressed else 'none'))
         env = os.environ.copy()
         env['SOURCE_DATE_EPOCH'] = '1767225600'
         subprocess.run(['mkimage', '-f', 'kernel.its', 'kernel.itb'], cwd=d, env=env, check=True)
@@ -98,7 +100,7 @@ def main():
         for region in layout['reserved_ranges']:
             lines.append(f'{region["name"]}: [0x{region["start"]:08x},0x{region["end"]:08x})')
         lines += ['U-Boot guard is conservative; confirm actual bdinfo and fixed-up FDT.',
-                  'Software checks only; Linux 6.18 physical boot NOT verified.']
+                  'Software checks only. Physical boot still requires verification.']
         args.output.with_suffix('.txt').write_text('\n'.join(lines) + '\n')
     print('Kernel FIT built and checked; hardware boot is not verified.')
 

@@ -1,0 +1,46 @@
+name: D213ECV vendor Linux 5.10 firmware
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md', 'LICENSE*', 'LICENSES/**', 'NOTICE']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d213ecv-linux510-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install build dependencies
+        run: |
+          ./scripts/host-deps.sh --install
+          sudo apt-get install --no-install-recommends -y python3-venv
+          python3 -m venv .cache/firmware-venv
+          .cache/firmware-venv/bin/pip install -r scripts/requirements-firmware.txt
+      - name: Fetch pinned vendor sources
+        run: |
+          ./scripts/fetch-ci-reference.sh https://github.com/boa-z/luban.git \
+            6812c56d060c7e88e5e5e831a7c915227485b788 .cache/luban-reference \
+            source/linux-5.10 source/uboot-2021.10 source/opensbi \
+            target/d211/common target/d211/demo128_nand tools/scripts
+      - name: Build and verify the complete recovery preserving update
+        run: |
+          export PATH="$PWD/.cache/firmware-venv/bin:$PATH"
+          ./scripts/build-vendor-linux510.sh .cache/luban-reference
+          (cd artifacts/d213ecv-linux510-system-update && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: d213ecv-linux510-system-update-${{ github.sha }}
+          path: artifacts/d213ecv-linux510-system-update/
+          if-no-files-found: error
+          retention-days: 14

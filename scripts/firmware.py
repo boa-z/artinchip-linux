@@ -113,6 +113,9 @@ def check_fit(path, require_hashes=False):
                 compression = fdtget(path, node, 'compression')
                 require(compression in ('gzip', 'none'), 'Unsupported kernel compression')
                 raw = gzip.decompress(payload.read_bytes()) if compression == 'gzip' else payload.read_bytes()
+                release = re.search(rb'Linux version ([0-9][^ \x00]{0,63}) \(', raw)
+                if release:
+                    records[-1]['release'] = release[1].decode('ascii')
                 kernel_contract = (parse_image(raw), int(fdtget(path, node, 'load', 'x'), 16),
                                    int(fdtget(path, node, 'entry', 'x'), 16))
             if kind == 'flat_dt' and 'kernel' in properties:
@@ -230,6 +233,9 @@ def pack(args):
     parts = partitions()
     system_update = getattr(args, 'system_update', False)
     require(not system_update or args.kernel, 'System update requires a kernel FIT')
+    vendor510 = getattr(args, 'vendor_linux510', False)
+    require(not vendor510 or system_update, 'Vendor Linux 5.10 requires a system update')
+    pins = json.loads((BOARD / 'vendor-sources.json').read_text())
     components = args.components.resolve()
     provenance = json.loads((components / 'components.json').read_text())
     require(provenance['board'] == LAYOUT['board'], 'Components are for another board')
@@ -246,6 +252,9 @@ def pack(args):
             require((components / name).stat().st_size <= parts[partition]['size'], 'Oversized boot component')
     if args.kernel:
         fits['kernel.itb'] = check_fit(args.kernel, require_hashes=True)
+        if vendor510:
+            releases = [r.get('release') for r in fits['kernel.itb']['images'] if r['type'] == 'kernel']
+            require(releases == [pins['vendor_kernel']['release']], 'Expected the pinned vendor Linux release')
         if system_update:
             sbi = [r for r in fits['kernel.itb']['images'] if r['type'] == 'firmware']
             require(len(sbi) == 1 and sbi[0]['sha256'] == provenance['sha256']['fw_dynamic.bin'],
@@ -293,7 +302,9 @@ def pack(args):
         images = list(stage.glob('*.img'))
         require(len(images) == 1, 'Vendor packer did not produce exactly one NAND image')
         result = verify_image(images[0], allow_system_update=system_update)
-        final = args.output / ('d213ecv-linux618-system-update.img' if system_update else 'd213ecv-demo128-nand.img')
+        filename = ('d213ecv-linux510-system-update.img' if vendor510 else
+                    'd213ecv-linux618-system-update.img' if system_update else 'd213ecv-demo128-nand.img')
+        final = args.output / filename
         shutil.copyfile(images[0], final)
         shutil.copyfile(stage / 'image_cfg.json', args.output / 'image_cfg.json')
     commit = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip()
@@ -302,16 +313,18 @@ def pack(args):
                 'project_commit': commit, 'working_tree_dirty': dirty,
                 'image_kind': 'experimental-system-update' if system_update else 'selective-update',
                 'boot_environment': environment,
-                'kernel_policy': 'experimental_6_18' if args.kernel else 'retain_factory_5_10',
+                'kernel_policy': ('rebuilt_vendor_5_10' if vendor510 else
+                                  'experimental_6_18' if args.kernel else 'retain_factory_5_10'),
                 'buildroot_source': json.loads((ROOT / 'sources.lock.json').read_text())['buildroot'],
-                'kernel_source': (json.loads((BOARD / 'vendor-sources.json').read_text())['kernel_reference']
+                'kernel_source': (pins['vendor_kernel'] if vendor510 else pins['kernel_reference']
                                   if args.kernel else 'existing factory NAND kernel; unchanged by this image'),
                 'rootfs': rootfs, 'fits': fits, 'environment': environment, 'firmware': result,
                 'component_provenance': provenance, 'packaging': 'passed',
                 'hardware_boot': 'not_verified', 'recovery_policy': 'never targeted'}
     (args.output / 'firmware-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     if system_update:
-        shutil.copyfile(ROOT / 'docs/system-update.md', args.output / 'README.md')
+        guide = 'vendor-linux510.md' if vendor510 else 'system-update.md'
+        shutil.copyfile(ROOT / 'docs' / guide, args.output / 'README.md')
     (args.output / 'SHA256SUMS').write_text(''.join(f'{sha256(p)}  {p.name}\n' for p in sorted(args.output.iterdir())
                                                 if p.is_file() and p.name != 'SHA256SUMS'))
     print('Packaging passed; hardware boot is NOT verified.')
@@ -334,6 +347,8 @@ def main():
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--system-update', action='store_true',
                    help='Update SPL/U-Boot/env/logo/kernel/rootfs; preserve Recovery and device data')
+    p.add_argument('--vendor-linux510', action='store_true',
+                   help='Label and validate the rebuilt vendor Linux 5.10 system image')
     args = parser.parse_args()
     if args.command == 'pack':
         pack(args)
